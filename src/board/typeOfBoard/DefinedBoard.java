@@ -1,0 +1,205 @@
+package board.typeOfBoard;
+
+import board.*;
+import entity.tower.Tower;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Random;
+
+
+public class DefinedBoard extends Board {
+
+    /**
+     * Les attributs de DefinedBoard
+     * un point de depart
+     */
+    private Position cheminAv;
+    private Position pointDeDepart;
+
+    /**
+     * Constructeur de DefinedBoard.
+     *
+     * @param height Height of the board (top to bottom)
+     * @param width  Width of the board (left to right)
+     */
+    public DefinedBoard(int height, int width) {
+        super(height, width);
+        init();
+    }
+
+    /**
+     * Initialiser le board
+     */
+    @Override
+    public void init() {
+        grid = new Cell[height][width];
+        for (int r = 0; r < height; r++) {
+            for (int c = 0; c < width; c++) {
+                grid[r][c] = new Cell(new Position(r, c));
+            }
+        }
+        calculerPath();
+    }
+
+
+    /**
+     * Retourner la longueur du chemin
+     * @return la longeur du chemin
+     */
+    public int getCheminLong() {
+        return this.allCells.size();
+    }
+
+    /**
+     * Verifier si une pos est le bord du board
+     * @param p la pos a verifier
+     * @return true si pos est le bord, false sinon
+     */
+    public boolean isBord(Position p) {
+        return p.getRow() == 0 || p.getRow() == this.height - 1
+                || p.getCol() == 0 || p.getCol() == this.width - 1;
+    }
+
+    /**
+     * Creer un chemin aleatoire
+     * Le chemin commence du point de depart 
+     */
+    @Override
+    public void calculerPath() {
+        Random rand = new Random();
+
+        int minLen = (this.width + this.height) / 2;
+
+        List<Position> listPositions = new ArrayList<>();
+
+        for (int j = 0; j < width; j++) {
+            listPositions.add(new Position(0, j));
+            listPositions.add(new Position(height - 1, j));
+        }
+
+        for (int i = 1; i < height - 1; i++) {
+            listPositions.add(new Position(i, 0));
+            listPositions.add(new Position(i, width - 1));
+        }
+
+        Position pRandom = listPositions.get(rand.nextInt(listPositions.size()));
+        pointDeDepart = pRandom;
+        cheminAv = pRandom;
+
+        getCell(pRandom.getRow(),pRandom.getCol()).assignChemin();
+        this.allCells.add(getCell(pRandom.getRow(),pRandom.getCol()));
+
+        List<Position> bloque = new ArrayList<>();
+        boolean fin = false;
+
+        while (!fin) {
+            List<Position> mesChoix = new ArrayList<>();
+
+            if (cheminAv.getCol() != 0) {
+                Position voisin = new Position(cheminAv.getRow(), cheminAv.getCol() - 1);
+                if (getCell(voisin.getRow(),voisin.getCol()).estVide() && !bloque.contains(voisin)) {
+                    mesChoix.add(voisin);
+                }
+            }
+
+            if (cheminAv.getCol() != width - 1) {
+                Position voisin = new Position(cheminAv.getRow(), cheminAv.getCol() + 1);
+                if (getCell(voisin.getRow(),voisin.getCol()).estVide() && !bloque.contains(voisin)) {
+                    mesChoix.add(voisin);
+                }
+            }
+
+            if (cheminAv.getRow() != 0) {
+                Position voisin = new Position(cheminAv.getRow() - 1, cheminAv.getCol());
+                if (getCell(voisin.getRow(),voisin.getCol()).estVide() && !bloque.contains(voisin)) {
+                    mesChoix.add(voisin);
+                }
+            }
+
+            if (cheminAv.getRow() != height - 1) {
+                Position voisin = new Position(cheminAv.getRow() + 1, cheminAv.getCol());
+                if (getCell(voisin.getRow(), voisin.getCol()).estVide() && !bloque.contains(voisin)) {
+                    mesChoix.add(voisin);
+                }
+            }
+
+            if (mesChoix.isEmpty()) {
+                break;
+            }
+
+
+            if (this.allCells.size() < minLen) {
+                List<Position> filtre = new ArrayList<>();
+                for (Position p : mesChoix) {
+                    if (!(isBord(p) && !p.equals(pointDeDepart))) {
+                        filtre.add(p);
+                    }
+                }
+                if (!filtre.isEmpty()) {
+                    mesChoix = filtre;
+                }
+            }
+
+            Position randi = mesChoix.get(rand.nextInt(mesChoix.size()));
+            getCell(randi.getRow(),randi.getCol()).assignChemin();
+            this.allCells.add(getCell(randi.getRow(), randi.getCol()));
+
+            if (cheminAv.getCol() != randi.getCol()) {
+                for (int rr = 0; rr < height; rr++) {
+                    bloque.add(new Position(rr, cheminAv.getCol()));
+                }
+            }
+
+            cheminAv = randi;
+
+            if (this.allCells.size() >= minLen && isBord(randi) && !randi.equals(pointDeDepart)) {
+                fin = true;
+            }
+        }
+        this.allPath.put(0, this.allCells);
+    }
+
+    public List<Position> getPathPositions() {
+        List<Position> path = new ArrayList<>();
+
+        for (Cell cell : allCells) {
+            path.add(cell.getPosition());
+        }
+
+        return path;
+    }
+
+    /**
+     * Verifier si un Cell est disponible, donc il n'y a pas de tower
+     * @return true si disponible, false sinon
+     */
+    public boolean isCellAvailable(int row, int col) {
+        if (!isInside(row, col)) {
+            return false;
+        }
+        for (Position p : getPathPositions()) {
+            if (p.getRow() == row && p.getCol() == col) {
+                return false;
+            }
+        }
+        for (Tower t : towers) {
+            if (t.getPosition().getRow() == row && t.getPosition().getCol() == col) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+
+    /**
+     * Retourner la liste des cells
+     * @return une liste des cells
+     */
+    @Override
+    public List<Cell> allCells(){
+        return this.allCells;
+    }
+
+}
